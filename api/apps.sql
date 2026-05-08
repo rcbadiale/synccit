@@ -3,7 +3,7 @@
 -- It can be in the same database as the rest of synccit though
 -- This is only for requesting a list of support applications
 -- It is not needed for synccit to function
-CREATE TABLE  `apps` (
+CREATE TABLE IF NOT EXISTS `apps` (
 `id` INT( 10 ) NOT NULL AUTO_INCREMENT PRIMARY KEY ,
 `name` VARCHAR( 128 ) NOT NULL ,
 `description` TEXT NULL ,

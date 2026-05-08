@@ -12,6 +12,18 @@ $apirevision = 12; // current revision. increments more. for smaller changes
 header("X-API: $apiversion");
 header("X-Revision: $apirevision");
 
+// ---- DEBUG ----
+function dbg($msg) {
+    global $debug;
+    if ($debug) error_log("[api.php] " . $msg);
+}
+dbg("Request received. Method=" . $_SERVER['REQUEST_METHOD']);
+dbg("POST keys: " . implode(", ", array_keys($_POST)));
+if (isset($_POST['data'])) dbg("POST[data] (first 200 chars): " . substr($_POST['data'], 0, 200));
+if (isset($_POST['mode'])) dbg("POST[mode]: " . $_POST['mode']);
+if (isset($_REQUEST['type'])) dbg("REQUEST[type]: " . $_REQUEST['type']);
+// ---- END DEBUG ----
+
 
 if(isset($_POST['data'])) {
 
@@ -22,6 +34,7 @@ if(isset($_POST['data'])) {
     }
 
     if(strtolower($_REQUEST['type']) == "xml") {
+        dbg("Mode: XML");
         // afaik SimpleXML loves throwing actual errors instead of suppressing pretty much everything
         // put it in try catch to try to get rid of that
         try {
@@ -37,6 +50,7 @@ if(isset($_POST['data'])) {
             $auth       = $xml -> auth;
             $mode       = $xml -> mode;
             $developer  = isset($xml -> dev) ? $xml -> dev : "unknown";
+            dbg("XML - username=$username mode=$mode developer=$developer");
 
             if($mode == "create") {
                 $password   = $xml -> password;
@@ -110,14 +124,17 @@ if(isset($_POST['data'])) {
 
 
         } catch (Exception $e){
+            dbg("XML exception: " . $e->getMessage());
             xerror("xml error", "xml");
         }
         xerror("xml error");
     } else { //we're just going to assume json if data variable is set with no type
+        dbg("Mode: JSON");
         // send correct content-type header
         header("Content-type: application/json");
         $json = json_decode($_POST['data'], true);
         if($json == false || $json == null) {
+            dbg("JSON decode failed. json_last_error=" . json_last_error() . " msg=" . json_last_error_msg());
             xerror("json error ".json_last_error(), "json");
         }
 
@@ -125,6 +142,7 @@ if(isset($_POST['data'])) {
         $auth       = $json["auth"];
         $mode       = $json["mode"];
         $developer  = isset($json["dev"]) ? $json["dev"] : "unknown";
+        dbg("JSON - username=$username mode=$mode developer=$developer");
 
 
 
@@ -157,6 +175,7 @@ if(isset($_POST['data'])) {
         $authinfo = checkAuth($username, $auth, "json");
 
         if($mode == "update") {
+            dbg("JSON update: " . count($json["links"]) . " links");
             $updates = array();
             foreach($json["links"] as $link) {
                 $id = $link["id"];
@@ -176,12 +195,15 @@ if(isset($_POST['data'])) {
             xsuccess(count($updates)." links updated", "json");
 
         } else if($mode == "history") {
+            dbg("JSON history: offset={$json['offset']} time={$json['time']}");
             $count      = $json["offset"];
             $time       = $json["time"];
             $result = historyLinks($authinfo["userid"], "json", $count, $time);
+            dbg("JSON history result length: " . strlen($result));
             echo $result;
             die;
         } else {
+            dbg("JSON read: " . count($json["links"]) . " links");
             $links = array();
             $i = 0;
             foreach($json["links"] as $link) {
@@ -189,6 +211,7 @@ if(isset($_POST['data'])) {
             }
 
             $result = readLinks($links, $authinfo["userid"], "json");
+            dbg("JSON read result length: " . strlen($result));
             echo $result;
             die;
         }
@@ -270,6 +293,7 @@ if(isset($_POST['data'])) {
 
 function checkAuth($username, $auth, $mode=false) {
     global $mysql;
+    dbg("checkAuth: username=$username mode=$mode");
     // seems running this and seeing if affected_rows was > 0 doesn't work.
     // this does help me get the user id I use later
     // but just using username probably wouldn't be a bad idea
@@ -282,30 +306,37 @@ function checkAuth($username, $auth, $mode=false) {
         WHERE
             `username` = '".$mysql->real_escape_string($username)."' AND
             `authhash` = '".$mysql->real_escape_string($auth)."' LIMIT 1";
-    
+
 
     if($res = $mysql->query($sql)) {
         //var_dump($result);
         if($res->num_rows > 0) {
             $info = $res->fetch_assoc();
+            dbg("checkAuth: auth token matched. userid={$info['userid']} device={$info['description']}");
             return array(
                 'username'  => $info['username'],
                 'userid'    => $info['userid'],
                 'device'    => $info['description']
             );
         } else {
+            dbg("checkAuth: no authcode row found, trying checkLogin");
             $r = checkLogin($username, $auth);
             if($r) {
+                dbg("checkAuth: checkLogin succeeded");
                 return $r;
             }
+            dbg("checkAuth: not authorized");
             xerror("not authorized", $mode);
         }
 
     } else {
+        dbg("checkAuth: query failed: " . $mysql->error . ", trying checkLogin");
         $r = checkLogin($username, $auth);
         if($r) {
+            dbg("checkAuth: checkLogin succeeded");
             return $r;
         }
+        dbg("checkAuth: not authorized");
         xerror("not authorized", $mode);
     }
 }
@@ -315,6 +346,7 @@ function checkAuth($username, $auth, $mode=false) {
 // if fails, then update row
 function insertLinks($updates, $developer, $user, $devicename) {
     global $mysql;
+    dbg("insertLinks: user=$user developer=$developer devicename=$devicename count=" . count($updates));
     //var_dump($updates);
     // just realized foreach can do keys. should change it
     while($current = current($updates)) {
@@ -357,6 +389,7 @@ function insertLinks($updates, $developer, $user, $devicename) {
                 )";
             $res = $mysql->query($sql);
             if(!$res) {
+                dbg("insertLinks: INSERT failed (likely duplicate), trying UPDATE. linkid=$linkid error=" . $mysql->error);
 
                 $sql = "
                 UPDATE `links`
@@ -386,9 +419,8 @@ function insertLinks($updates, $developer, $user, $devicename) {
                     LIMIT 1
                 ";
                 $res = $mysql->query($sql);
-                //var_dump($res);
+                if(!$res) dbg("insertLinks: UPDATE also failed for linkid=$linkid error=" . $mysql->error);
             }
-            //var_dump($res);
         }
         next($updates);
     }
@@ -400,6 +432,7 @@ function insertLinks($updates, $developer, $user, $devicename) {
 // default (null) is text
 function readLinks($links, $user, $type=null) {
     global $mysql;
+    dbg("readLinks: user=$user type=$type count=" . count($links));
     if(count($links) < 1) {
         xerror("no links requested", $type);
         return false;
@@ -423,8 +456,13 @@ function readLinks($links, $user, $type=null) {
 
 
     $result = $mysql->query($sql);
+    if (!$result) {
+        dbg("readLinks: query failed: " . $mysql->error);
+    } else {
+        dbg("readLinks: query returned " . $result->num_rows . " rows");
+    }
 
-    if($result->num_rows < 1) {
+    if(!$result || $result->num_rows < 1) {
         // this probably actually shouldn't be an error
         if($type == "json") {
             return "[]";
@@ -488,6 +526,7 @@ function readLinks($links, $user, $type=null) {
 
 function historyLinks($user, $type=null, $links=0, $time=0) {
     global $mysql;
+    dbg("historyLinks: user=$user type=$type offset=$links time=$time");
 
 
 
@@ -566,6 +605,7 @@ function historyLinks($user, $type=null, $links=0, $time=0) {
 }
 
 function createAccount($username, $password, $email, $developer) {
+    dbg("createAccount: username=$username email=$email developer=$developer");
     // This is copy and pasted from create.php
     // Will make account creation a separate class in the future
     $error = "";
@@ -616,13 +656,15 @@ function createAccount($username, $password, $email, $developer) {
         )";
 
         if($mysql->query($sql)) {
+            dbg("createAccount: user inserted successfully");
             // Success
             // just return nothing meaning no error
             $error = "";
 
         } else {
-            $r = $mysql->query("SELECT * FROM `user` WHERE `username` = '".mysql_real_escape_string($username)."' LIMIT 1");
-            if($r->num_rows > 0) {
+            dbg("createAccount: INSERT failed: " . $mysql->error);
+            $r = $mysql->query("SELECT * FROM `user` WHERE `username` = '".$mysql->real_escape_string($username)."' LIMIT 1");
+            if($r && $r->num_rows > 0) {
                 $error = "username already exists";
             } else {
                 $error = "database error";
@@ -636,7 +678,7 @@ function createAccount($username, $password, $email, $developer) {
 
 function checkLogin($username, $password) {
     global $mysql;
-
+    dbg("checkLogin: username=$username");
 
     $userinfo = $mysql->query("SELECT * FROM `user` WHERE `username` = '".$mysql->real_escape_string($username)."' LIMIT 1");
 
@@ -653,18 +695,23 @@ function checkLogin($username, $password) {
         $result = validate_password($password, $hashset);
 
         if($result) {
+            dbg("checkLogin: password valid for username=$username");
             return array(
                 'username'  => $user['username'],
                 'userid'    => $user['id'],
                 'device'    => "none"
             );
         } else {
+            dbg("checkLogin: password invalid for username=$username");
             return false;
         }
+    } else {
+        dbg("checkLogin: user not found: $username");
     }
 }
 
 function addAuth($username, $password, $device, $developer) {
+    dbg("addAuth: username=$username device=$device developer=$developer");
 
     global $mysql;
 

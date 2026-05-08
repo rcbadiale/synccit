@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS `links` (
   `userid` int(10) unsigned NOT NULL,
   `lastvisit` int(10) unsigned NOT NULL,
   `lastcommenttime` int(10) unsigned NOT NULL,
-  `lastcommentcount` int(6) unsigned NOT NULL,
+  `lastcommentcount` int(6) NOT NULL DEFAULT '-1',
   `firstvisit` int(10) unsigned NOT NULL,
   `lastcall` text NOT NULL,
   `developers` text NOT NULL,

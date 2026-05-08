@@ -13,6 +13,49 @@
 3. Edit `config.php` with database info and API location
 4. Site should up and running. Go to index.php in browser
 
+# Running with Docker
+
+## Local (development)
+
+This project includes a Docker setup with PHP/Apache + MariaDB.
+
+1. Build and start containers:
+
+    docker compose up --build
+
+2. Open the app:
+
+    http://localhost:8080
+
+3. Stop containers:
+
+    docker compose down
+
+Notes:
+
+* Database schema is initialized automatically from `mysql.sql`.
+* App environment variables are defined in `docker-compose.yml`.
+
+## Production example
+
+An example production compose file is included as `docker-compose.prod.yml`.
+
+1. Build/publish an app image and set it in `docker-compose.prod.yml`:
+
+    image: synccit-web:latest
+
+2. Create an env file from the example and set secure values:
+
+    cp .env.example .env
+
+3. Start in detached mode:
+
+    docker compose --env-file .env -f docker-compose.prod.yml up -d
+
+4. Stop production stack:
+
+    docker compose --env-file .env -f docker-compose.prod.yml down
+
 #Updating
 
 1. Replace all files except config.php
@@ -23,11 +66,11 @@
 
 API is called on api.php. This is located at [http://api.synccit.com/api.php](http://api.synccit.com/api.php). If not using synccit.com, this should be shown on devices page.
 
-Basic idea. When someone clicks on a link on reddit, the ID of link clicked is sent here. When someone clicks on a comment thread, the number of comments that thead has and it's ID is sent here. So when looking at reddit later, no matter what device, the link will show up read and if there are any new comments. 
+Basic idea. When someone clicks on a link on reddit, the ID of link clicked is sent here. When someone clicks on a comment thread, the number of comments that thead has and it's ID is sent here. So when looking at reddit later, no matter what device, the link will show up read and if there are any new comments.
 
 The API includes 2 variables. The API version and revision. The version is only changed when major changes to the API occur and will break older uses of it. The revision is for smaller changes. This usually means adding features or small changes that don't break any older use of the API.
 
-To determine the version and revision of the API being used, check the headers sent by api.php. `curl -I http://api.synccit.com/api.php` gives me `X-API: 1` and `X-Revision: 8`. To see how revisions change, you can check [the api.php history](https://github.com/drakeapps/synccit/commits/master/api/api.php). 
+To determine the version and revision of the API being used, check the headers sent by api.php. `curl -I http://api.synccit.com/api.php` gives me `X-API: 1` and `X-Revision: 8`. To see how revisions change, you can check [the api.php history](https://github.com/drakeapps/synccit/commits/master/api/api.php).
 
 **Auth code and passwords**
 
@@ -47,7 +90,7 @@ For ease of use on the user's side, accounts can be created and auth codes added
  * synccit username
 * **`auth`**
  * device auth code (users get this from devices page)
- * As of revision 11, password will be accepted (though auth code should still be used instead) 
+ * As of revision 11, password will be accepted (though auth code should still be used instead)
 * **`dev`**
  * Your developer name
  * Name you want to appear as, such as synccit-userscript or iReddit
@@ -373,7 +416,7 @@ The GET or POST variable `type` has to be set to xml or, as of API revision 10, 
         <auth>9m89x0</auth>
         <dev>synccit xml</dev>
         <mode>update</mode>
-    
+
         <links>
             <link>
                 <id>111111</id>
@@ -390,7 +433,7 @@ The GET or POST variable `type` has to be set to xml or, as of API revision 10, 
             <link>
                 <id>444444</id>
             </link>
-     
+
         </links>
     </synccit>
 
@@ -429,7 +472,7 @@ Error
         <auth>9m89x0</auth>
         <dev>synccit xml</dev>
         <mode>read</mode>
-    
+
         <links>
             <link>
                 <id>11111</id>
@@ -577,7 +620,7 @@ Error
 
 ***
 
-### Example XML add authorization 
+### Example XML add authorization
 
     <?xml version="1.0"?>
     <synccit>
@@ -601,7 +644,7 @@ Success
         <auth>303b09</auth>
     </synccit>
 
-Returns auth code under `auth`. Use this for future API calls for this user. 
+Returns auth code under `auth`. Use this for future API calls for this user.
 
 Error
 
@@ -671,7 +714,7 @@ Link `555555` not returned since it was never updated.
  * No post data sent or at least none that we know what to do with
 * `not authorized`
  * Username and auth code combination doesn't work
-* `no links requested` 
+* `no links requested`
  * No links submitted to be checked
 * `no links found`
  * None of links requested have history (only in plain text mode)

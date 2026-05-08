@@ -1,0 +1,46 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: synccit-web
+    ports:
+      - "8080:80"
+    environment:
+      DB_HOST: db
+      DB_USER: synccit
+      DB_PASS: synccit
+      DB_NAME: rddtsync
+      BASE_URL: ""
+      BASE_HOST: http://localhost:8080
+      API_LOC: http://localhost:8080/api/
+      DEBUG: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/var/www/html
+
+  db:
+    image: mariadb:10.5
+    container_name: synccit-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: rddtsync
+      MARIADB_USER: synccit
+      MARIADB_PASSWORD: synccit
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./mysql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./api/apps.sql:/docker-entrypoint-initdb.d/02-apps.sql:ro
+
+volumes:
+  db_data:

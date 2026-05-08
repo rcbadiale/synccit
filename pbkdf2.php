@@ -20,8 +20,8 @@ define("HASH_PBKDF2_INDEX", 3);
 function create_hash($password)
 {
     // format: algorithm:iterations:salt:hash
-    $salt = base64_encode(mcrypt_create_iv(PBKDF2_SALT_BYTES, MCRYPT_DEV_URANDOM));
-    return PBKDF2_HASH_ALGORITHM . ":" . PBKDF2_ITERATIONS . ":" .  $salt . ":" . 
+    $salt = base64_encode(generate_secure_salt(PBKDF2_SALT_BYTES));
+    return PBKDF2_HASH_ALGORITHM . ":" . PBKDF2_ITERATIONS . ":" .  $salt . ":" .
         base64_encode(pbkdf2(
             PBKDF2_HASH_ALGORITHM,
             $password,
@@ -32,11 +32,28 @@ function create_hash($password)
         ));
 }
 
+function generate_secure_salt($bytes)
+{
+    if(function_exists('random_bytes')) {
+        return random_bytes($bytes);
+    }
+
+    if(function_exists('openssl_random_pseudo_bytes')) {
+        $strong = false;
+        $random = openssl_random_pseudo_bytes($bytes, $strong);
+        if($random !== false && $strong === true) {
+            return $random;
+        }
+    }
+
+    die('PBKDF2 ERROR: No suitable CSPRNG available for salt generation.');
+}
+
 function validate_password($password, $good_hash)
 {
     $params = explode(":", $good_hash);
     if(count($params) < HASH_SECTIONS)
-       return false; 
+       return false;
     $pbkdf2 = base64_decode($params[HASH_PBKDF2_INDEX]);
     return slow_equals(
         $pbkdf2,
@@ -59,7 +76,7 @@ function slow_equals($a, $b)
     {
         $diff |= ord($a[$i]) ^ ord($b[$i]);
     }
-    return $diff === 0; 
+    return $diff === 0;
 }
 
 /*

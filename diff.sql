@@ -44,6 +44,13 @@ ALTER TABLE  `logincodes` ADD INDEX (  `authhash` );
 -- ----------------------------------------------
 
 
+-- change `lastcommentcount` to signed to allow -1 as a sentinel value meaning "no comment data"
+ALTER TABLE `links` MODIFY `lastcommentcount` INT(6) NOT NULL DEFAULT -1;
+
+
+-- ----------------------------------------------
+
+
 
 -- after 67185d8
 
